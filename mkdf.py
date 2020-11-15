@@ -17,7 +17,7 @@ from dash.dash import no_update
 from dash.dependencies import Input, Output
 
 import settings
-from pgconn import cont_material, cont_query, send_query
+from pgconn import cont_material, cont_query, send_query, cut_description
 
 lines = [
     'LZ-01', 'LZ-02', 'LZ-03',
@@ -274,7 +274,7 @@ def shift_let_list():
 def rd_plan_csv():
     # Эта функция читает CSV плана производства
 
-    plan_letter = r'K:\STP\Display\Page\Shift.csv'
+    plan_letter = path / r'Shift.csv'
 
     df_letter = pd.read_csv(plan_letter,  sep=';')
     df_letter.reset_index(inplace=True)
@@ -285,6 +285,8 @@ def rd_plan_csv():
 def make_bar(df_line_lvl_1,indicat_df,line):
     # Эта функция принимает df_line_lvl_1  
     
+    print(df_line_lvl_1)
+
     if not df_line_lvl_1.empty :
         line_name=df_line_lvl_1['Line'].iloc[0]
     
@@ -319,9 +321,6 @@ def make_bar(df_line_lvl_1,indicat_df,line):
 
         month = datetime.today().month
         year = datetime.today().year
-
-        #print(ready_df)
-    
 
     # группирование по букве смены
     ready_df=ready_df.groupby(['letter']).sum() 
@@ -574,16 +573,46 @@ def make_line(df, dt, dt2):
 
         df2['Stop Start'] = df2['Stop Time']-df2['Minutes']
 
-        fig.add_trace(go.Bar(y = df2['Counter OUT'], 
-                        x = df2['Stop Time']-df2['Minutes']/2, 
-                        width = df2['TimeRaw']*1000,
-                        hovertext = (
-                            df2['Stop Code'] + ': ' + df2['name_ru'] + 
-                            '.<br>Stopped at '+ df2['Stop Start'].astype(str).str[11:] +
-                            '<br>Duration: ' + df2['Minutes'].astype(str).str[7:15]),
-                        hoverinfo='text',
-                        marker_color = df2['color']))
+        fig.add_trace(
+            go.Bar(
+                y = df2['Counter OUT'], 
+                x = df2['Stop Time']-df2['Minutes']/2, 
+                width = df2['TimeRaw']*1000,
+                hovertext = (
+                    df2['Stop Code'] + ': ' + df2['name_ru'] + 
+                    '.<br>Stopped at '+ df2['Stop Start'].astype(str).str[11:] +
+                    '<br>Duration: ' + df2['Minutes'].astype(str).str[7:15]),
+                name=code + ' {:>10}'.format(str(df2['Minutes'].sum())[-8:]),
+                hoverinfo='text',
+                marker_color = df2['color']))
     
+    
+    orders = set(df['Order'].values.tolist())
+
+    for order in orders:
+        started = df.loc[df['Order'] == order, 'Stop Time'].min()
+        ended = df.loc[df['Order'] == order, 'Stop Time'].max()
+
+        dif = ended-started
+        dif = dif.total_seconds()
+
+        fig.add_trace(
+            go.Bar(
+                y = [lineq], 
+                x = [started], 
+                width=dif*1000,
+                offset=dif/2,
+                hovertext = order,
+                name=order,
+                hoverinfo='text',
+                showlegend=False,
+                opacity=0.15,
+                text=order,
+                textposition='auto',
+                marker_color = '#1d2321'
+            )
+        )
+
     if not df.empty:
 
         fig.update_layout(
@@ -610,30 +639,36 @@ def make_line(df, dt, dt2):
         )
     
 
-    #fig.show()
+    fig.show()
 
     return fig
 
 def get_df_con():
-    # эта функция обращается к таблице up_line_def
-    # и получает из нее текущие значения по состоянию линии,
-    # возвращает сформированный df. Передается в get_df_bar_indicat
+    """Эта функция обращается к таблице up_line_def и получает из 
+    нее текущие значения по состоянию линии, возвращает сформированный 
+    df. Передается в get_df_bar_indicat """
 
-    # чтение всей таблицы up_line_def
-    df = pd.DataFrame(cont_query())
+    # для режима тестирования
+    if True:
 
-    # присвоение имен столбцов
-    df.columns = [
-        'line',             # fc_line
-        'order',            # prod_order
-        'shift',            # shift
-        'status',           # starus_line
-        'puco_need',        # puco_need
-        'counter in',       # counter_start
-        'counter out',      # counter_end
-        'stop_time',        # stop_time
-        'code'              # puco_string
-    ]
+        df = pd.read_csv(path / r'.\data\test_cont_table.csv', index_col=0, sep=';', dtype='string')
+
+    else:
+        # чтение всей таблицы up_line_def
+        df = pd.DataFrame(cont_query())
+
+        # присвоение имен столбцов
+        df.columns = [
+            'line',             # fc_line
+            'order',            # prod_order
+            'shift',            # shift
+            'status',           # starus_line
+            'puco_need',        # puco_need
+            'counter in',       # counter_start
+            'counter out',      # counter_end
+            'stop_time',        # stop_time
+            'code'              # puco_string
+        ]
 
     # номер смены имеет формат TEXT в таблице.
     # его необходимо преобразовать
@@ -652,7 +687,29 @@ def get_df_bar_indicat(df, line):
     df = df.reset_index()
     
     orderno = df['order'].iloc[0]
-    order_description = cont_material(orderno)
+    
+    
+    if True:
+        df_index = pd.read_csv(path / r'.\data\test_orders.csv', sep = ';', index_col=0,dtype='string')
+        df_order = pd.read_csv(path / r'.\data\test_indexes.csv', sep = ';', index_col=0,dtype='string')
+
+        # Попытка найти индекс в тестовом фрейме. Если не найден, присвоить значение "00000"
+        # Большая часть индексов будет найдена так как фрейм содержит все записи до 15.11.20
+        try:
+            index = df_index.loc[df_index['Order']==orderno, 'Index'].iloc[0]
+        except IndexError:
+            index = '00000'
+        
+        # Если индекс вдруг не найден, вывести надпись о тестмоде.
+        if index != '00000':
+            order_description = df_order.loc[df_order['Index'] == index, 'Holding Name'].iloc[0]
+            order_description = cut_description(order_description) # обрезать до 30 символов
+        else:
+            order_description = 'TestMode.LostIndex'
+        
+
+    else:
+        order_description = cont_material(orderno)
 
     ln_input = df['counter in'].iloc[0]
     ln_output = df['counter out'].iloc[0]
@@ -820,16 +877,12 @@ def Plan_table(df_line_lvl_1):
 
 if __name__ == '__main__':
 
-    dt= '20201003'
-    dt2='20201004'
+    dt= '20201015'
+    dt2='20201016'
 
     df_lvl_0 = get_df_lvl_0(dt,dt2, 'test')
 
-    line = 'LN-03'
-
-    #print(get_df_lvl_0(dt,dt2), get_df_lvl_0(dt,dt2))
-    #line='LZ-03'
-    #get_df_con()
+    line = 'LL-02'
 
     def _call_line():
     
@@ -838,13 +891,11 @@ if __name__ == '__main__':
 
         #print(df_line_lvl_1)
 
-    #_call_line()
-
-
     def _call_bar():
 
         df_line_lvl_1 = get_df_line_lvl_1(df_lvl_0, line)
         indicat_df=get_df_con()
         make_bar(df_line_lvl_1,indicat_df,line)
 
-    _call_bar()
+    _call_line()
+    #_call_bar()

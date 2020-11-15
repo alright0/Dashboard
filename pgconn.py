@@ -87,7 +87,9 @@ def cont_material(orderno):
         WHERE \
             po_id = '" + str(orderno) + "'")
 
+
     article = cursor.fetchall()[0]
+
 
     cursor.execute(
         """SELECT
@@ -99,7 +101,14 @@ def cont_material(orderno):
 
     result = cursor.fetchall()[0][0]
 
+
+    
+    return cut_description(result) 
+
+def cut_description(result):
+    """Эта функция обрезает длинное имя заказа до 30 символов"""
+    
     if len(result) > 30:
         result = result[:30] + '...'
-    
-    return result 
+
+    return result

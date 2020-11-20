@@ -168,14 +168,3 @@ def get_line_graph(dt):
 if __name__ == '__main__':
     app.run_server(debug=True)
     #app.run_server(host='10.81.50.14', port=5000, debug=False)
-
-"""
-                dcc.Graph(
-                    id=line + ' code table',
-                    figure=mkdf.make_line_table(
-                        ln_line,
-                        date_start,
-                        date_end)[1],
-                    config=dict(displayModeBar=False)
-                    ),
-"""

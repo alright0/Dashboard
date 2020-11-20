@@ -4,6 +4,7 @@ from collections import deque
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import dash
 import dash_core_components as dcc
 import dash_daq as daq
@@ -17,7 +18,7 @@ from dash.dash import no_update
 from dash.dependencies import Input, Output
 
 import settings
-from pgconn import cont_material, cont_query, send_query, cut_description
+from pgconn import cont_material, cont_query, cut_description, send_query
 
 lines = [
     'LZ-01', 'LZ-02', 'LZ-03',
@@ -283,9 +284,8 @@ def rd_plan_csv():
     return df_letter
 
 def make_bar(df_line_lvl_1,indicat_df,line):
-    # Эта функция принимает df_line_lvl_1  
-    
-    print(df_line_lvl_1)
+    """ Эта функция принимает df_line_lvl_1 и строит план-фактный график работы линий.
+    Не подходит для линий LL и LP, поскольку к ним понятие плана в таком виде не применимо"""
 
     if not df_line_lvl_1.empty :
         line_name=df_line_lvl_1['Line'].iloc[0]
@@ -353,7 +353,7 @@ def make_bar(df_line_lvl_1,indicat_df,line):
         (df_letter['month'] == month) &
         (df_letter['line'] == line_name)])
     
-
+    print(df_letter)
     df_letter.reset_index(inplace=True)
 
     plan = df_letter['plan'].iloc[0]
@@ -463,7 +463,7 @@ def make_bar(df_line_lvl_1,indicat_df,line):
             ]
         )
     
-    #fig.show()
+    fig.show()
 
     shift_df=ready_df.copy()
     shift_df.loc['Total']=shift_df.sum()
@@ -498,54 +498,83 @@ def make_bar(df_line_lvl_1,indicat_df,line):
     return fig, fig_t
 
 def make_line(df, dt, dt2):
+    """Эта функция создает график линий с отметками по остановкам и 
+    простой таблицей по выпуску за смену"""
 
+    # здесь создается переменная, хранящая норму выпуска. Если имя линии не найдено в 
+    # словаре, то норма равна нулю. 
     try:
         lineq = settings.LINE_OUTPUT[df['Line'].iloc[0]]
     except:
         lineq=0
 
+    # даты начала и конца временных промежутков(сутки с 8.00 до 8.00)
     dtst = datetime.strptime(dt+'080000', '%Y%m%d%H%M%S')
     dtst2 = datetime.strptime(dt2+'080000', '%Y%m%d%H%M%S')
     
+    df['Stop Start'] = df['Stop Time']-df['Minutes']
+    # Ограничение df по времени
+    df=df.loc[(df['Stop Start']>dtst) & (df['Stop Time']<dtst2)]
+
+
+    # Список кодов остановок за вышеуказанный период
     codes = pd.unique(df['Stop Code']).tolist()
 
-    df=df.loc[(df['Stop Time']>dtst) & (df['Stop Time']<dtst2)]
+    # Output - общий выпуск
+    fig = go.Figure(
+        data=go.Scatter( 
+            y = df['Counter OUT'], 
+            x = df['Stop Time'],
+            hoverinfo = 'none',
+            name = 'Output',
+            line_color='#3d8dd1',
+        ),
+        layout=go.Layout(
+            margin=dict(t=10,l=10,b=10,r=10)),
+    )
 
-    
+    # Input(sheets) - счетчик входа
+    fig.add_trace(
+        go.Scatter(
+            y = df['Counter IN'], 
+            x = df['Stop Time'],
+            name = 'Input(sheets)',
+            line_color='#4b9bde',
+            hoverinfo='none',
+            line = dict(
+                width=2, 
+                dash='dash'
+            )
+        )
+    )
 
-    fig = go.Figure(data=go.Scatter( y = df['Counter OUT'], 
-                            x = df['Stop Time'],
-                            hoverinfo = 'none',
-                            name = 'Output',
-                            line_color='#3d8dd1',
-                            ),
-                    layout=go.Layout(
-                            margin=dict(t=10,l=10,b=10,r=10)),
-                    )
+    # Output Shift - выпуск за смену - основной показатель
+    fig.add_trace(
+        go.Scatter(
+            y = df.groupby('Shift')['Sheets'].cumsum(), 
+            x = df['Stop Time'],
+            name = 'Output Shift',
+            line_color='#0f2994',
+            hoverinfo='none',
+        )
+    )
 
-    fig.add_trace(go.Scatter( y = df['Counter IN'], 
-                            x = df['Stop Time'],
-                            name = 'Input(sheets)',
-                            line_color='#4b9bde',
-                            hoverinfo='none',
-                            line = dict(width=2, dash='dash')))
+    # eff. 75% - верхняя граница графика(переменная lineq)
+    fig.add_trace(
+        go.Scatter(
+            y0 = lineq,
+            x=df['Stop Time'],
+            name='eff. 75%:{:3}'.format('') + str(lineq/1000) + 'K',
+            line_color='#8ad9eb',
+            hoverinfo='none',
+            line = dict(width=2, dash='dash')
+        )
+    )
 
-    fig.add_trace(go.Scatter( y = df.groupby('Shift')['Sheets'].cumsum(), 
-                            x = df['Stop Time'],
-                            name = 'Output Shift',
-                            line_color='#0f2994',
-                            hoverinfo='none',
-                            ))
+    # в этом df лежат стопы больше указанного времени, по ним строятся аннотации
+    df2=df.loc[(df['Minutes'] > timedelta(minutes=30)) & (df['Status'] == 'STOP')]
 
-    fig.add_trace(go.Scatter(y0 = lineq,
-                            x=df['Stop Time'],
-                            name='eff. 75%:{:3}'.format('') + str(lineq/1000) + 'K',
-                            line_color='#8ad9eb',
-                            hoverinfo='none',
-                            line = dict(width=2, dash='dash')))
-
-    df2=df.loc[(df['Minutes'] > timedelta(minutes=35)) & (df['Status'] == 'STOP')]
-
+    # здесь добавляются аннотации на основании df2
     if not df2.empty:
         for i in range(len(df2)):
             fig.add_annotation(
@@ -563,16 +592,16 @@ def make_line(df, dt, dt2):
     # Здесь создаются столбцы по кодам остановок. Цикл проходит по каждому коду и 
     # добавляет все столбцы. Этот цикл организован таким образом, чтобы можно было 
     # выставлять разные цвета
-    
     for code in codes:
+        
+        # фильтрация df
         df2 = df.loc[
             (df['Stop Code'] == code) & 
             (df['TimeRaw'] > 60) & 
-            (df['Status'] == 'STOP')]
+            (df['Status'] == 'STOP') 
+        ]
 
-
-        df2['Stop Start'] = df2['Stop Time']-df2['Minutes']
-
+        # добавление столбцов кодов на основную фигуру
         fig.add_trace(
             go.Bar(
                 y = df2['Counter OUT'], 
@@ -586,43 +615,60 @@ def make_line(df, dt, dt2):
                 hoverinfo='text',
                 marker_color = df2['color']))
     
-    
+    # получение списка заказов
     orders = set(df['Order'].values.tolist())
-
+    
+    # добавление заказов на график.
     for order in orders:
-        started = df.loc[df['Order'] == order, 'Stop Time'].min()
-        ended = df.loc[df['Order'] == order, 'Stop Time'].max()
 
-        dif = ended-started
-        dif = dif.total_seconds()
+        linex = df.loc[df['Order'] == order]
+
+        print(linex)
+
 
         fig.add_trace(
-            go.Bar(
-                y = [lineq], 
-                x = [started], 
-                width=dif*1000,
-                offset=dif/2,
+            go.Scatter(
+                y = linex['Counter OUT'],#[lineq], 
+                x = linex['Stop Time'], 
+                line = dict(
+                    width=12,
+                ),
                 hovertext = order,
                 name=order,
                 hoverinfo='text',
                 showlegend=False,
-                opacity=0.15,
+                opacity=0.5,
                 text=order,
-                textposition='auto',
-                marker_color = '#1d2321'
             )
         )
 
+    # если df не пустой, то добавить легенду и имя линии как аннотацию. 
+    # иначе скрыть все оси и вывести на график аннотацию "NO DATA" 
     if not df.empty:
 
         fig.update_layout(
             legend=dict(
-            yanchor="top",
-            y=0.99,
-            xanchor="left",
-            x=0.01,
-        ))
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01,
+            )
+        )
         
+        """
+        fig.add_annotation(
+            text=df['Line'].iloc[0],
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=0.5,
+            opacity=0.4,
+            showarrow=False,
+            font=dict(
+                size=72
+            )
+        )
+        """
     else:
         fig.update_layout(
             xaxis={'visible':False},
@@ -875,10 +921,53 @@ def Plan_table(df_line_lvl_1):
 
     print(df_report.groupby(['Line','Date','Shift','letter']).sum())
 
+
+def ibea_stat():
+    """Эта функция обрабатывает файлы статистики камеры"""
+
+    # выбор колонок по номерам, поскольку файл собран очень плохо и четверть колонок 
+    # не содержит даже заголовка. 
+    cols=[1,2,4,5,6,8,9,10,13,14,15,16,17,18,19,20,21,22,23,24,25,28,29,30,31,37]
+    df_ibea_raw = pd.read_csv(path / 'z_cumulated.csv', sep=';', usecols=cols)
+
+    
+
+    df_ibea_raw.columns=[
+        'Date Start',       # 1
+        'Time Start',       # 2
+        'Date End',         # 4
+        'TIme End',         # 5
+        'Order',            # 6
+        'Total',            # 8
+        'Rejected',         # 9
+        'Dropped',          # 10
+        'Inspected',        # 13
+        'Defects',          # 14
+        'Object faults',    # 15
+        'Area faults',      # 16
+        'Zrkadlo 1',        # 17
+        'Jadro 1',          # 18
+        'Lacq',             # 19
+        'Zrkadlo 2',        # 20
+        'Zrkadlo 3',        # 21
+        'Zrkadlo 4',        # 22
+        'Panel 7',          # 23
+        'Zliabok 1',        # 24
+        'Outer 2',          # 25
+        'Hacik',            # 28
+        'Zliabok',          # 29
+        'Jadro',            # 30
+        'Okraj',            # 31
+        'Diameter'          # 37
+
+    ]
+
+    print(df_ibea_raw.dtypes)
+
 if __name__ == '__main__':
 
-    dt= '20201015'
-    dt2='20201016'
+    dt= '20201007'
+    dt2='20201008'
 
     df_lvl_0 = get_df_lvl_0(dt,dt2, 'test')
 
@@ -886,10 +975,12 @@ if __name__ == '__main__':
 
     def _call_line():
     
+       
+
+
         df_line_lvl_1 = get_df_line_lvl_1(df_lvl_0, line)
         make_line(df_line_lvl_1,dt,dt2)
 
-        #print(df_line_lvl_1)
 
     def _call_bar():
 
@@ -897,5 +988,10 @@ if __name__ == '__main__':
         indicat_df=get_df_con()
         make_bar(df_line_lvl_1,indicat_df,line)
 
-    _call_line()
+    def _ibea_cal():
+
+        ibea_stat()
+
+    #_call_line()
     #_call_bar()
+    _ibea_cal()

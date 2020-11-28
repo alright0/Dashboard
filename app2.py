@@ -56,9 +56,9 @@ app.layout = html.Div(
                         # календарь для выбора дня
                         dcc.DatePickerSingle(
                             id='TablesDPS',
-                            min_date_allowed=dtime(2017, 1, 1),
-                            max_date_allowed=(
-                                dtime.today()),
+                            min_date_allowed=dtime(2020, 1, 1),
+#                            max_date_allowed=(
+ #                               dtime.today()),
                             initial_visible_month=(
                                 dtime.today()-timedelta(days=1)),
                             date=dtime.today()-timedelta(days=1),

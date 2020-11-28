@@ -1,4 +1,5 @@
 import csv
+import time
 from calendar import monthrange
 from collections import deque
 from datetime import date, datetime, timedelta
@@ -34,50 +35,18 @@ df_codes = pd.read_csv(path / '.\Codes.csv', index_col=0, sep=';')
 df_codes.reset_index(inplace=True)
 
 
-
-def get_df_lvl_0(dt, dt2, status="test"):
+def get_df_lvl_0(dt, dt2):
     """Эта функция создает 'сырой' df для последующей обработки"""
 
-    # Этот блок создан для тестового режима: читаемый df из /data 
-    # является первоначальной выгрузкой из таблицы 4can up_line_def
-    if status == 'test':
-        
-        df_lvl_0 = pd.read_csv(
-            path / r'.\data\test_frame_20.csv', 
-            sep=';', 
-            dtype='object')
+    df_lvl_0 = send_query(dt,dt2)
 
-        df_lvl_0.reset_index(inplace=True)
-
-        # ограничение по дате. Сравнение дат в данном случае сходно
-        # со сравнением дат при запросе в БД - числовое
-        df_lvl_0 = df_lvl_0.loc[
-            (df_lvl_0['DateStart'].astype(int) >= int(dt)) &
-            (df_lvl_0['DateEnd'].astype(int) <= int(dt2))]
-
-    else:
-
-        df_lvl_0 = pd.DataFrame(send_query(dt, dt2))
-
-        # присвоение имен колонок
-        df_lvl_0.columns = [
-            'Line',                     # a1
-            'Order',                    # a9
-            'Counter IN',               # a16
-            'Counter OUT',              # a17
-            'Shift',                    # a12
-            'Stop Code',                # a14
-            'DateStart',                # a4
-            'TimeStart',                # a5
-            'DateEnd',                  # a7
-            'TimeEnd'                   # a8
-        ]
-
-    # Преобразование даты старта из текста в дату
-    df_lvl_0['DateStart'] = pd.to_datetime(df_lvl_0['DateStart'])
+    #if not df_lvl_0.empty:
 
     # преобразование дата финиши из текста в дату
-    df_lvl_0['DateEnd'] = pd.to_datetime(df_lvl_0['DateEnd'])
+    df_lvl_0['DateEnd'] = pd.to_datetime(df_lvl_0['DateEnd'], format='%Y%m%d')
+
+    # Преобразование даты старта из текста в дату
+    df_lvl_0['DateStart'] = pd.to_datetime(df_lvl_0['DateStart'], format='%Y%m%d')
 
     # Смена
     df_lvl_0['Shift'] = pd.to_numeric(df_lvl_0['Shift'])
@@ -134,8 +103,12 @@ def get_df_line_lvl_1(df, line):
     """Эта функция формирует принимает датафрейм нулевого уровня(df_lvl_0) и
     создает фрейм первого уровня, который выступает списком данных для создания гарфика """
 
+    #if not df.empty:
+
     df2 = df.loc[(df['Line'] == line) & (df['TimeStopRaw'] > 0)]
     
+    #print(df2)
+
     # расчет разницы между предыдущим и следующим значениями 
     # для возможности рассчитать суммарный выпуск
     df2['Sheets'] = pd.to_numeric(df2['Counter OUT'].diff())
@@ -230,6 +203,10 @@ def get_df_line_lvl_1(df, line):
     
     return df4
 
+    #else:
+
+    #    return df
+
 def shift_let_list():
     # эта функция размечает смены(ABCD) в зависимости от даты и номера смены.
     # Сейчас ничего не принимает на вход и размечает весь 2020 год.
@@ -280,12 +257,11 @@ def rd_plan_csv():
     df_letter = pd.read_csv(plan_letter,  sep=';')
     df_letter.reset_index(inplace=True)
 
-
     return df_letter
 
 def make_bar(df_line_lvl_1,indicat_df,line):
     """ Эта функция принимает df_line_lvl_1 и строит план-фактный график работы линий.
-    Не подходит для линий LL и LP, поскольку к ним понятие плана в таком виде не применимо"""
+    НЕ ПОДХОДИТ ДЛЯ ЛИНИЙ LL и LP, поскольку к ним понятие плана в таком виде не применимо"""
 
     if not df_line_lvl_1.empty :
         line_name=df_line_lvl_1['Line'].iloc[0]
@@ -353,7 +329,7 @@ def make_bar(df_line_lvl_1,indicat_df,line):
         (df_letter['month'] == month) &
         (df_letter['line'] == line_name)])
     
-    print(df_letter)
+    #print(df_letter)
     df_letter.reset_index(inplace=True)
 
     plan = df_letter['plan'].iloc[0]
@@ -463,7 +439,7 @@ def make_bar(df_line_lvl_1,indicat_df,line):
             ]
         )
     
-    fig.show()
+    #fig.show()
 
     shift_df=ready_df.copy()
     shift_df.loc['Total']=shift_df.sum()
@@ -512,9 +488,11 @@ def make_line(df, dt, dt2):
     dtst = datetime.strptime(dt+'080000', '%Y%m%d%H%M%S')
     dtst2 = datetime.strptime(dt2+'080000', '%Y%m%d%H%M%S')
     
+    #if not df.empty:
+
     df['Stop Start'] = df['Stop Time']-df['Minutes']
     # Ограничение df по времени
-    df=df.loc[(df['Stop Start']>dtst) & (df['Stop Time']<dtst2)]
+    df=df.loc[(df['Stop Time']>dtst) & (df['Stop Time']<dtst2)]
 
 
     # Список кодов остановок за вышеуказанный период
@@ -574,6 +552,24 @@ def make_line(df, dt, dt2):
     # в этом df лежат стопы больше указанного времени, по ним строятся аннотации
     df2=df.loc[(df['Minutes'] > timedelta(minutes=30)) & (df['Status'] == 'STOP')]
 
+    # получение списка заказов
+    orders = set(df['Order'].values.tolist())
+
+    """
+    else:
+        df2=df.copy()
+        codes=[]
+        orders=[]
+
+        print(df2)
+        fig = go.Figure(
+            data=go.Scatter( 
+                y = [], 
+                x = [],
+            )
+        )
+
+    """
     # здесь добавляются аннотации на основании df2
     if not df2.empty:
         for i in range(len(df2)):
@@ -615,16 +611,12 @@ def make_line(df, dt, dt2):
                 hoverinfo='text',
                 marker_color = df2['color']))
     
-    # получение списка заказов
-    orders = set(df['Order'].values.tolist())
+    
     
     # добавление заказов на график.
     for order in orders:
 
         linex = df.loc[df['Order'] == order]
-
-        print(linex)
-
 
         fig.add_trace(
             go.Scatter(
@@ -633,7 +625,7 @@ def make_line(df, dt, dt2):
                 line = dict(
                     width=12,
                 ),
-                hovertext = order,
+                hovertext = '{}: {}'.format(order, cont_material(order)),
                 name=order,
                 hoverinfo='text',
                 showlegend=False,
@@ -685,7 +677,7 @@ def make_line(df, dt, dt2):
         )
     
 
-    fig.show()
+    #fig.show()
 
     return fig
 
@@ -694,27 +686,7 @@ def get_df_con():
     нее текущие значения по состоянию линии, возвращает сформированный 
     df. Передается в get_df_bar_indicat """
 
-    # для режима тестирования
-    if True:
-
-        df = pd.read_csv(path / r'.\data\test_cont_table.csv', index_col=0, sep=';', dtype='string')
-
-    else:
-        # чтение всей таблицы up_line_def
-        df = pd.DataFrame(cont_query())
-
-        # присвоение имен столбцов
-        df.columns = [
-            'line',             # fc_line
-            'order',            # prod_order
-            'shift',            # shift
-            'status',           # starus_line
-            'puco_need',        # puco_need
-            'counter in',       # counter_start
-            'counter out',      # counter_end
-            'stop_time',        # stop_time
-            'code'              # puco_string
-        ]
+    df = cont_query()
 
     # номер смены имеет формат TEXT в таблице.
     # его необходимо преобразовать
@@ -734,28 +706,7 @@ def get_df_bar_indicat(df, line):
     
     orderno = df['order'].iloc[0]
     
-    
-    if True:
-        df_index = pd.read_csv(path / r'.\data\test_orders.csv', sep = ';', index_col=0,dtype='string')
-        df_order = pd.read_csv(path / r'.\data\test_indexes.csv', sep = ';', index_col=0,dtype='string')
-
-        # Попытка найти индекс в тестовом фрейме. Если не найден, присвоить значение "00000"
-        # Большая часть индексов будет найдена так как фрейм содержит все записи до 15.11.20
-        try:
-            index = df_index.loc[df_index['Order']==orderno, 'Index'].iloc[0]
-        except IndexError:
-            index = '00000'
-        
-        # Если индекс вдруг не найден, вывести надпись о тестмоде.
-        if index != '00000':
-            order_description = df_order.loc[df_order['Index'] == index, 'Holding Name'].iloc[0]
-            order_description = cut_description(order_description) # обрезать до 30 символов
-        else:
-            order_description = 'TestMode.LostIndex'
-        
-
-    else:
-        order_description = cont_material(orderno)
+    order_description = cont_material(orderno)
 
     ln_input = df['counter in'].iloc[0]
     ln_output = df['counter out'].iloc[0]
@@ -808,6 +759,8 @@ def make_line_table(df_line_lvl_1, dt, dt2):
     # форматирование входящей даты за период с 8:00 до 8:00
     dtst = datetime.strptime(dt+'080000', '%Y%m%d%H%M%S')
     dtst2 = datetime.strptime(dt2+'080000', '%Y%m%d%H%M%S')
+
+    #if not df_line_lvl_1.empty:
 
     # Обрезание df до указанного периода времени
     df_line_lvl_1 = df_line_lvl_1.loc[
@@ -919,59 +872,88 @@ def Plan_table(df_line_lvl_1):
 
     df_report=df_line_lvl_1[['Line','letter','Date', 'Shift','Sheets']]
 
-    print(df_report.groupby(['Line','Date','Shift','letter']).sum())
+    #print(df_report.groupby(['Line','Date','Shift','letter']).sum())
 
 
 def ibea_stat():
     """Эта функция обрабатывает файлы статистики камеры"""
 
-    # выбор колонок по номерам, поскольку файл собран очень плохо и четверть колонок 
-    # не содержит даже заголовка. 
-    cols=[1,2,4,5,6,8,9,10,13,14,15,16,17,18,19,20,21,22,23,24,25,28,29,30,31,37]
-    df_ibea_raw = pd.read_csv(path / 'z_cumulated.csv', sep=';', usecols=cols)
+    shift_start = pd.to_datetime('07:50:00',format='%H:%M:%S').time()
+    shift_end = pd.to_datetime('19:50:00',format='%H:%M:%S').time()
+
+
+    cols = [1, 2, 4, 5, 6, 8, 9]
+    df_ibea_raw = pd.read_csv(path / 'z_cumulated.csv', sep=';', usecols=cols, parse_dates=[0,1,2,3])
+
 
     
-
+    
     df_ibea_raw.columns=[
         'Date Start',       # 1
         'Time Start',       # 2
         'Date End',         # 4
-        'TIme End',         # 5
+        'Time End',         # 5
         'Order',            # 6
         'Total',            # 8
         'Rejected',         # 9
-        'Dropped',          # 10
-        'Inspected',        # 13
-        'Defects',          # 14
-        'Object faults',    # 15
-        'Area faults',      # 16
-        'Zrkadlo 1',        # 17
-        'Jadro 1',          # 18
-        'Lacq',             # 19
-        'Zrkadlo 2',        # 20
-        'Zrkadlo 3',        # 21
-        'Zrkadlo 4',        # 22
-        'Panel 7',          # 23
-        'Zliabok 1',        # 24
-        'Outer 2',          # 25
-        'Hacik',            # 28
-        'Zliabok',          # 29
-        'Jadro',            # 30
-        'Okraj',            # 31
-        'Diameter'          # 37
-
     ]
+    df_ibea_raw=df_ibea_raw.sort_values(by='Date Start')
 
-    print(df_ibea_raw.dtypes)
+    df_ibea_raw = df_ibea_raw.loc[df_ibea_raw['Date End']>pd.to_datetime('01.01.2020', format='%d.%m.%Y')]
+    df_ibea_raw = df_ibea_raw.loc[df_ibea_raw['Total']>1000]
+
+    df_ibea_raw['Time Start'] = [time.time() for time in pd.to_datetime(df_ibea_raw['Time Start'])]
+    df_ibea_raw['Time End'] = [time.time() for time in pd.to_datetime(df_ibea_raw['Time End'])]
+
+    df_ibea_raw.to_csv('21223.csv', sep=';')
+    #df_ibea_raw['Date Start'] = pd.to_datetime(df_ibea_raw['Date Start'])
+    #df_ibea_raw['Date End'] = pd.to_datetime(df_ibea_raw['Date End'])
+    
+
+
+    df_ibea_raw['Percent'] = df_ibea_raw['Rejected']/df_ibea_raw['Total']*100
+    df_ibea_raw['line']='LZ-01'
+
+
+    df_ibea_raw['Shift'] = (df_ibea_raw['Time Start'] < shift_end) & (df_ibea_raw['Time End'] > shift_start)
+    
+    df_ibea_raw['Shift'] = df_ibea_raw['Shift'].apply(lambda x: 1 if x else 2 )
+
+    df_ibea_raw = df_ibea_raw.loc[df_ibea_raw['Percent'] <= 10] 
+
+
+    #
+    
+    #df_ibea_raw = df_ibea_raw.groupby('Date Start').mean()
+    #df_ibea_raw.reset_index(inplace=True)
+    
+    df_ibea_raw.to_csv('213.csv', sep=';')
+
+    print(df_ibea_raw)
+
+    return df_ibea_raw
+
+def ibea_graph(df_ibea):
+
+    fig = go.Figure(
+        data=go.Scatter( 
+            x=df_ibea['Date Start'],
+            y=df_ibea['Percent']
+        )
+    )
+    
+
+    #fig.show()
 
 if __name__ == '__main__':
 
-    dt= '20201007'
-    dt2='20201008'
+    dt= '20201125'
+    dt2='20201126'
 
-    df_lvl_0 = get_df_lvl_0(dt,dt2, 'test')
+    df_lvl_0 = get_df_lvl_0(dt,dt2)
+    print(df_lvl_0)
 
-    line = 'LL-02'
+    line = 'LZ-01'
 
     def _call_line():
     
@@ -990,8 +972,9 @@ if __name__ == '__main__':
 
     def _ibea_cal():
 
-        ibea_stat()
+        #ibea_stat()
+        ibea_graph(ibea_stat())
 
-    #_call_line()
+    _call_line()
     #_call_bar()
-    _ibea_cal()
+    #_ibea_cal()

@@ -627,6 +627,7 @@ def make_line(df, dt, dt2):
                 ),
                 hovertext = '{}: {}'.format(order, cont_material(order)),
                 name=order,
+                connectgaps=False,
                 hoverinfo='text',
                 showlegend=False,
                 opacity=0.5,
@@ -957,8 +958,6 @@ if __name__ == '__main__':
 
     def _call_line():
     
-       
-
 
         df_line_lvl_1 = get_df_line_lvl_1(df_lvl_0, line)
         make_line(df_line_lvl_1,dt,dt2)

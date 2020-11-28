@@ -12,7 +12,7 @@ path = Path(__file__).parents[0]
 dt0 = int(datetime.today().strftime('%Y%m%d'))
 
 dt3 = pd.read_csv(
-        path / r'.\data\test_frame_20.csv', 
+        path / r'.\data\line_data.csv', 
         sep=';', 
         dtype='object'
     )
@@ -30,11 +30,11 @@ indpuco - время записи из контроллера
 """
 
 def _up_puco_export_cache(dt,dt2):
-    """ Эта функция возвращает "кэшированный" файл базы данных.
+    """ Эта функция читает "кэшированный" файл базы данных.
     Быстрее работает с ранними датами, снижает нагрузку на БД"""
 
     df_lvl_0_cache = pd.read_csv(
-        path / r'.\data\test_frame_20.csv', 
+        path / r'.\data\line_data.csv', 
         sep=';', 
         dtype='object'
     )
@@ -49,17 +49,14 @@ def _up_puco_export_cache(dt,dt2):
 
     return df_lvl_0_cache
 
-def send_query(dtstart, dtend):
+def send_query(dtstart, dtend, mode='read'):
     """ Этот запрос получает данные для df нулевого уровня для 
     создания графиков линий, таблиц и фактической выработки """
     
     # если дата меньше сегодня и больше начала кэшированного фрейма, 
     # то вернуть данные из кэша, если нет - из базы. 
     # Если база недоступна - вернуть пустой df
-    
-    
-
-    if dt0 > int(dtend) and int(dtstart) < dt3:
+    if dt0 > int(dtend) and int(dtstart) < int(dt3) and mode == 'read':
         
         return _up_puco_export_cache(dtstart, dtend)
 
@@ -149,10 +146,11 @@ def cont_material(orderno):
     """Этот запрос обращается в as_line_speed и as_material_data 
     и передает наименование заказа по его номеру"""
 
-
+    # сначала попытаться найти необходимый интекс в файл, 
+    # если не найден, обратиться к базе 
     try:
         df_indexes = pd.read_csv(
-                path / r'.\data\test_orders.csv', 
+                path / r'.\data\as_line_speed.csv', 
                 sep=';', 
                 dtype='object')
 
@@ -162,6 +160,7 @@ def cont_material(orderno):
     except IndexError:
         
         try:
+            # инициализовать подключение
             cursor=init_dbcon()
 
             cursor.execute(
@@ -175,26 +174,27 @@ def cont_material(orderno):
 
             index = 'index not found'
 
-    
-    #print(index)
-
+    # по индексу получить его описание. Сначала посмотреть в файле, 
+    # если не найдено, обратиться в таблицу
     try:
         df_orders = pd.read_csv(
-                path / r'.\data\test_indexes.csv', 
+                path / r'.\data\as_material_data.csv', 
                 sep=';', 
                 dtype='object')
 
         df_orders = df_orders.loc[df_orders['Index']==index]
         
+        #обрезать имя до 30 символов, если надо
         return cut_description(df_orders['Holding Name'].iloc[0])
 
     except IndexError:
 
         try:
+
             cursor.execute(
                 """SELECT the_name_of_the_holding_company
-                FROM as_material_data
-                WHERE article = '{}' """.format(index[0]))
+                FROM as_material_dat
+                WHERE article = '{}' """.format(index))
 
             result = cursor.fetchall()[0][0]
 
@@ -217,6 +217,5 @@ if __name__ == '__main__':
     dt= '20201001'
     dt2='20201205'
 
-    #print(_today_compare())
-    print(cont_material('00284'))
+    print(cont_material('00901'))
     

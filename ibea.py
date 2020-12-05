@@ -96,7 +96,7 @@ def _ibea_agregate():
 
             df = pd.read_csv(pth, sep=";")
             df = df.loc[
-                pd.to_datetime(df["Date Start"])
+                pd.to_datetime(df["Date End"])
                 >= pd.to_datetime("01.01.2020", format="%d.%m.%Y")
             ]
 
@@ -162,7 +162,7 @@ def ibea_stat(orderno):
     df_ibea_raw["Percent"] = df_ibea_raw["Rejected"] / df_ibea_raw["Total"] * 100
 
     # разметка смен. Возвращение True и False
-    df_ibea_raw["Shift"] = (df_ibea_raw["Time Start"] < shift_end) & (
+    df_ibea_raw["Shift"] = (df_ibea_raw["Time End"] < shift_end) & (
         df_ibea_raw["Time End"] > shift_start
     )
 
@@ -177,7 +177,7 @@ def ibea_stat(orderno):
         df_ibea_raw,
         values=["Total", "Rejected", "Percent"],
         index=[
-            "Date Start",
+            "Date End",
             "Shift",
             "Order",
             "Description",

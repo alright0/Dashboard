@@ -38,7 +38,7 @@ app.layout = html.Div(
                 if len(order) == 5
             ],
             placeholder="Select Order",
-            style={"width": "500px"},
+            style={"width": "300px", "margin-bottom": "5px"},
         ),
         html.Div(
             id="table",
@@ -55,7 +55,7 @@ app.layout = html.Div(
 def fill_table(orderno):
 
     df = ibea.ibea_stat(orderno)
-    df["Date Start"] = pd.to_datetime(df["Date Start"], format="%d.%m.%Y").astype(str)
+    df["Date End"] = pd.to_datetime(df["Date End"], format="%d.%m.%Y").astype(str)
 
     df.style.format({"Percent": "{:.2%}"})
     print(df)
@@ -64,23 +64,27 @@ def fill_table(orderno):
 
         df = df.append(
             {
-                "Date Start": "<b>Total",
+                "Date End": "",
                 "Shift": "",
                 "Order": "",
                 "Description": "",
-                "line": "",
+                "line": "<b>Total",
                 "Percent": df["Rejected"].sum() / df["Total"].sum() * 100,
                 "Rejected": df["Rejected"].sum(),
                 "Total": df["Total"].sum(),
             },
             ignore_index=True,
         )
+    else:
+        # показ примечания по статитстике, так как всегда передается пустой df
+        df = pd.DataFrame(["You have to select order to see the statistic"])
+        df.columns = ["information"]
 
     # таблица
     fig = go.Figure(
         data=[
             go.Table(
-                columnwidth=[25, 10, 20, 50, 20, 15, 20, 20],
+                columnwidth=[20, 10, 15, 70, 15, 15, 20, 20],
                 header=dict(values=df.columns.values, height=30),
                 cells=dict(
                     values=df.transpose(),

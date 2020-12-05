@@ -142,9 +142,11 @@ def cont_query():
             dtype='object'
         )
 
-def cont_material(orderno):
+
+def cont_material(orderno, usedb=True):
     """Этот запрос обращается в as_line_speed и as_material_data 
-    и передает наименование заказа по его номеру"""
+    и передает наименование заказа по его номеру. usedb=True - обращение к базе. 
+    Можно отключить для ускорения работы"""
 
     # сначала попытаться найти необходимый интекс в файл, 
     # если не найден, обратиться к базе 
@@ -159,19 +161,22 @@ def cont_material(orderno):
 
     except IndexError:
         
-        try:
-            # инициализовать подключение
-            cursor=init_dbcon()
+        if usedb:
+            try:
+                # инициализовать подключение
+                cursor=init_dbcon()
 
-            cursor.execute(
-                """SELECT product_id
-                FROM as_line_speed 
-                WHERE po_id = '{}' """.format(str(orderno)))
+                cursor.execute(
+                    """SELECT product_id
+                    FROM as_line_speed 
+                    WHERE po_id = '{}' """.format(str(orderno)))
 
-            index = cursor.fetchall()[0][0]
+                index = cursor.fetchall()[0][0]
 
-        except:
+            except:
 
+                index = 'index not found'
+        else:
             index = 'index not found'
 
     # по индексу получить его описание. Сначала посмотреть в файле, 
@@ -189,19 +194,22 @@ def cont_material(orderno):
 
     except IndexError:
 
-        try:
+        if usedb:
+            try:
 
-            cursor.execute(
-                """SELECT the_name_of_the_holding_company
-                FROM as_material_dat
-                WHERE article = '{}' """.format(index))
+                cursor.execute(
+                    """SELECT the_name_of_the_holding_company
+                    FROM as_material_dat
+                    WHERE article = '{}' """.format(index))
 
-            result = cursor.fetchall()[0][0]
+                result = cursor.fetchall()[0][0]
 
-            return cut_description(result) 
+                return cut_description(result) 
 
-        except:
+            except:
 
+                return 'description not found'
+        else:
             return 'description not found'
 
 def cut_description(result):

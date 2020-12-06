@@ -38,7 +38,7 @@ lines = [
 # эта строка реализует относительные пути через pathlib
 path = Path(__file__).parents[0]
 
-df_codes = pd.read_csv(path / ".\Codes.csv", index_col=0, sep=";")
+df_codes = pd.read_csv(path / r".\Codes.csv", index_col=0, sep=";")
 df_codes.reset_index(inplace=True)
 
 
@@ -49,8 +49,6 @@ def get_df_lvl_0(dt, dt2):
     """Эта функция создает 'сырой' df для последующей обработки"""
 
     df_lvl_0 = send_query(dt, dt2)
-
-    # if not df_lvl_0.empty:
 
     # преобразование дата финиши из текста в дату
     df_lvl_0["DateEnd"] = pd.to_datetime(df_lvl_0["DateEnd"], format="%Y%m%d")
@@ -120,8 +118,6 @@ def get_df_lvl_0(dt, dt2):
 def get_df_line_lvl_1(df, line):
     """Эта функция формирует принимает датафрейм нулевого уровня(df_lvl_0) и
     создает фрейм первого уровня, который выступает списком данных для создания гарфика"""
-
-    # if not df.empty:
 
     df2 = df.loc[(df["Line"] == line) & (df["TimeStopRaw"] > 0)]
 
@@ -584,21 +580,6 @@ def make_line(df, dt, dt2):
     # получение списка заказов
     orders = set(df["Order"].values.tolist())
 
-    """
-    else:
-        df2=df.copy()
-        codes=[]
-        orders=[]
-
-        print(df2)
-        fig = go.Figure(
-            data=go.Scatter( 
-                y = [], 
-                x = [],
-            )
-        )
-
-    """
     # здесь добавляются аннотации на основании df2
     if not df2.empty:
         for i in range(len(df2)):
@@ -681,6 +662,7 @@ def make_line(df, dt, dt2):
         )
 
         """
+        # название линии в центре
         fig.add_annotation(
             text=df['Line'].iloc[0],
             xref="paper",
@@ -915,173 +897,10 @@ def Plan_table(df_line_lvl_1):
     # print(df_report.groupby(['Line','Date','Shift','letter']).sum())
 
 
-def ibea_connect():
-
-    cols = [1, 2, 4, 5, 6, 8, 9]
-
-    for line in settings.IBEA_ADDRESS:
-
-        try:
-
-            copyfrom = "//{}/ibea/statistics/z_cumulated.csv".format(
-                settings.IBEA_ADDRESS.get(line)
-            )
-            copyto = path / "data/IBEA/{}/z_cumulated.csv".format(line)
-
-            # print(path)
-            shutil.copyfile(copyfrom, copyto)
-            print(f"{line} copied")
-
-            df = pd.read_csv(
-                copyto,
-                sep=";",
-                encoding="ISO-8859-1",
-                usecols=cols,
-            )
-
-            df.columns = [
-                "Date Start",  # 1
-                "Time Start",  # 2
-                "Date End",  # 4
-                "Time End",  # 5
-                "Order",  # 6
-                "Total",  # 8
-                "Rejected",  # 9
-            ]
-
-            df["line"] = line
-
-            df["Date Start"] = df["Date Start"].str.strip()
-            df["Date End"] = df["Date End"].str.strip()
-
-            # df = df.loc[pd.to_datetime(df['Date Start']) >= pd.to_datetime('01.01.2020', format='%d.%m.%Y')]
-
-            df.to_csv(copyto, sep=";", index=False, encoding="utf-8")
-
-            print("saved")
-
-        except UnicodeDecodeError:
-            print(f"{line} failed because of encoding")
-
-        except:
-            print(f"{line} failed ")
-
-    _ibea_agregate()
-
-
-def _ibea_agregate():
-
-    dfs = []
-
-    for line in settings.IBEA_ADDRESS:
-        pth = path / "data/IBEA/{}/z_cumulated.csv".format(line)
-
-        try:
-            df = pd.read_csv(pth, sep=";")
-            df = df.loc[
-                pd.to_datetime(df["Date Start"])
-                >= pd.to_datetime("01.01.2020", format="%d.%m.%Y")
-            ]
-            dfs.append(df)
-        except FileNotFoundError:
-            print("file {}.csv not found".format(line))
-
-    df_full = pd.concat(dfs)
-
-    df_full.to_csv(
-        path / "data/IBEA/full_commulated.csv", sep=";", index=False, encoding="utf-8"
-    )
-
-
-def ibea_orders():
-
-    df_ibea_orders = pd.read_csv(path / "data/IBEA/full_commulated.csv", sep=";")
-
-    order_set = set(df_ibea_orders["Order"])
-    return dict(zip(order_set, [cont_material(_, usedb=False) for _ in order_set]))
-
-
-def ibea_stat(orderno):
-    """Эта функция обрабатывает файлы статистики камеры"""
-
-    df_ibea_raw = pd.read_csv(path / "data/IBEA/full_commulated.csv", sep=";")
-
-    shift_start = pd.to_datetime("07:50:00", format="%H:%M:%S").time()
-    shift_end = pd.to_datetime("19:50:00", format="%H:%M:%S").time()
-
-    df_ibea_raw["Date Start"] = pd.to_datetime(
-        df_ibea_raw["Date Start"], format="%d.%m.%Y"
-    )
-    df_ibea_raw["Date End"] = pd.to_datetime(df_ibea_raw["Date End"], format="%d.%m.%Y")
-    df_ibea_raw["Time Start"] = [
-        time.time() for time in pd.to_datetime(df_ibea_raw["Time Start"].astype(str))
-    ]
-    df_ibea_raw["Time End"] = [
-        time.time() for time in pd.to_datetime(df_ibea_raw["Time End"].astype(str))
-    ]
-
-    # df_ibea_raw = df_ibea_raw.loc[df_ibea_raw['Date Start']>pd.to_datetime('01.01.2020', format='%d.%m.%Y')]
-    df_ibea_raw = df_ibea_raw.loc[
-        (df_ibea_raw["Total"] > 1000) & (df_ibea_raw["Order"] == orderno)
-    ]
-
-    # список уникальных значений заказов
-    orders = set(df_ibea_raw["Order"])
-
-    # словарь сопоставлений заказов и описаний к ним
-    descript_dict = dict(zip(orders, [cont_material(_, usedb=False) for _ in orders]))
-
-    df_ibea_raw["Description"] = df_ibea_raw["Order"].map(descript_dict)
-
-    df_ibea_raw.to_csv("21223.csv", sep=";", index=False)
-
-    df_ibea_raw["Percent"] = df_ibea_raw["Rejected"] / df_ibea_raw["Total"] * 100
-
-    df_ibea_raw["Shift"] = (df_ibea_raw["Time Start"] < shift_end) & (
-        df_ibea_raw["Time End"] > shift_start
-    )
-
-    df_ibea_raw["Shift"] = df_ibea_raw["Shift"].apply(lambda x: 1 if x else 2)
-
-    df_ibea_raw = df_ibea_raw.loc[df_ibea_raw["Percent"] <= 10]
-
-    df_ibea_raw.sort_values(by="Date Start", inplace=True)
-
-    # print(df_ibea_raw)
-
-    df_table = pd.pivot_table(
-        df_ibea_raw,
-        values=["Total", "Rejected", "Percent"],
-        index=[
-            "Date Start",
-            "Shift",
-            "Order",
-            "Description",
-            "line",
-        ],
-        aggfunc={
-            "Total": np.sum,
-            "Rejected": np.sum,
-            "Percent": np.mean,
-        },
-    ).reset_index()
-
-    print(df_table)
-
-    return df_table
-
-
-def ibea_graph(df_ibea):
-
-    fig = go.Figure(data=go.Bar(x=df_ibea["Date Start"], y=df_ibea["Percent"]))
-
-    # fig.show()
-
-
 if __name__ == "__main__":
 
-    dt = "20201125"
-    dt2 = "20201126"
+    dt = "20201225"
+    dt2 = "20201226"
 
     df_lvl_0 = get_df_lvl_0(dt, dt2)
     # print(df_lvl_0)
@@ -1099,18 +918,5 @@ if __name__ == "__main__":
         indicat_df = get_df_con()
         make_bar(df_line_lvl_1, indicat_df, line)
 
-    def _ibea_cal():
-
-        ibea_connect()
-        # _ibea_agregate()
-        # ibea_orders()
-
-        # pth= path / r'.\ibea_test.csv'
-        # df_test = pd.read_csv(pth,sep=';')
-        ibea_stat("00864")
-
-        # ibea_graph(ibea_stat())
-
     # _call_line()
     # _call_bar()
-    _ibea_cal()

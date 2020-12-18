@@ -23,47 +23,8 @@ app = dash.Dash(
 
 lines = ["LZ-01", "LZ-02", "LZ-03", "LZ-04", "LZ-05", "LN-01", "LN-03"]
 
-app.layout = html.Div(
-    [
-        # основная страница
-        dcc.Interval(id="live_updated", interval=7000, n_intervals=0),
-        html.Div(
-            children=[
-                html.Div(
-                    [
-                        html.Div(
-                            id="title",
-                            children=[
-                                html.H1(
-                                    children="План производства",
-                                    style={"fontsize": 18, "color": "#002F6C"},
-                                )
-                            ],
-                            style={
-                                "text-align": "center",
-                            },
-                        ),
-                        dbc.Row(
-                            id="bar_row",
-                            style={
-                                "width": "99%",
-                                "height": "100%",
-                                "margin-left": "1%",
-                            },
-                        ),
-                    ],
-                ),
-            ]
-        ),
-    ]
-)
 
-
-@app.callback(
-    dash.dependencies.Output("bar_row", "children"),
-    [dash.dependencies.Input("live_updated", "n_intervals")],
-)
-def get_bar_graph(*args):
+def get_bar_graph():
 
     indicat_df = mkdf.get_df_con()
 
@@ -112,6 +73,52 @@ def get_bar_graph(*args):
         )
 
     return [ln for ln in bargraph]
+
+
+app.layout = html.Div(
+    [
+        # основная страница
+        dcc.Interval(id="live_updated", interval=7000, n_intervals=0),
+        html.Div(
+            children=[
+                html.Div(
+                    [
+                        html.Div(
+                            id="title",
+                            children=[
+                                html.H1(
+                                    children="План производства",
+                                    style={"fontsize": 18, "color": "#002F6C"},
+                                )
+                            ],
+                            style={
+                                "text-align": "center",
+                            },
+                        ),
+                        dbc.Row(
+                            id="bar_row",
+                            children=get_bar_graph(),
+                            style={
+                                "width": "99%",
+                                "height": "100%",
+                                "margin-left": "1%",
+                            },
+                        ),
+                    ],
+                ),
+            ]
+        ),
+    ]
+)
+
+
+@app.callback(
+    dash.dependencies.Output("bar_row", "children"),
+    [dash.dependencies.Input("live_updated", "n_intervals")],
+)
+def update_graph(*args):
+
+    return get_bar_graph()
 
 
 if __name__ == "__main__":

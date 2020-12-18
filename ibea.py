@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import psycopg2
+from datetime import timedelta
 
 import settings
 from pgconn import cont_material
@@ -86,7 +87,21 @@ def ibea_stat(orderno):
         },
     ).reset_index()
 
-    # print(df_table)
+    #    df_table["Date End"] = (
+    #       df_table["Date End"] - timedelta(days=1)
+    #      if df_table["Shift"] == 2
+    #     else df_table["Date End"]
+    # )
+
+    df_table.loc[df_table["Shift"] == 2, "Date End"] = df_table["Date End"] - timedelta(
+        days=1
+    )
+
+    df_table = df_table.sort_values(
+        by=["Date End"],
+    )
+
+    print(df_table)
 
     return df_table
 
@@ -95,6 +110,6 @@ if __name__ == "__main__":
 
     def _ibea_cal():
 
-        ibea_stat("00864")
+        ibea_stat("00908")
 
     _ibea_cal()

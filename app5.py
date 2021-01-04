@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime, timedelta
 
 import dash
 import dash_bootstrap_components as dbc
@@ -11,11 +12,13 @@ from dash.dependencies import Input, Output
 
 import ibea
 import pgconn
+from settings import IBEA_ADDRESS
 from server import server
 
 path = Path(__file__).parents[0]
 
 orders_dict = ibea.ibea_orders()
+
 
 app = dash.Dash(
     __name__,
@@ -38,27 +41,33 @@ app.layout = html.Div(
                 if len(order) == 5
             ],
             placeholder="Select Order",
-            style={"width": "300px", "margin-bottom": "5px"},
+            style={"width": "600px", "margin-bottom": "5px"},
         ),
         html.Div(
             id="table",
             style={"width": "800px"},
         ),
+        dcc.DatePickerRange(
+            id="datepicker",
+            month_format="X",
+            end_date_placeholder_text="X",
+            start_date=datetime.today() - timedelta(days=3),
+            end_date=datetime.today(),
+        ),
+        html.Div(
+            id="timetable",
+            style={"width": "800px"},
+        ),
     ],
 )
 
-# формирование таблицы. на вход принимает номер заказа, на выход дает таблицу
-@app.callback(
-    [Output("table", "children")],
-    [Input("orders", "value")],
-)
-def fill_table(orderno):
 
-    df = ibea.ibea_stat(orderno)
+def mk_table(df):
+
     df["Date End"] = pd.to_datetime(df["Date End"], format="%d.%m.%Y").astype(str)
 
     df.style.format({"Percent": "{:.2%}"})
-    print(df)
+    # print(df)
     # добавление последней строки с итогами
     if not df.empty:
 
@@ -114,6 +123,29 @@ def fill_table(orderno):
             config=dict(displayModeBar=False),
         )
     ]
+
+
+# формирование таблицы. на вход принимает номер заказа, на выход дает таблицу
+@app.callback(
+    [Output("table", "children")],
+    [Input("orders", "value")],
+)
+def fill_table(orderno):
+
+    return mk_table(ibea.ibea_stat(orderno))
+
+
+@app.callback(
+    [Output("timetable", "children")],
+    [Input("datepicker", "start_date"), Input("datepicker", "end_date")],
+)
+def table_by_date(dt, dt2):
+
+    df = ibea.ibea_date(dt, dt2)
+
+    print(df[df["line"].str.contains(r"1\b") == True])
+
+    # return html.Div(children=[mk_table(ibea.ibea_date(dt, dt2, line))]) for line in IBEA_ADDRESS
 
 
 if __name__ == "__main__":

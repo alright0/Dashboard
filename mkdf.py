@@ -181,7 +181,8 @@ def get_df_line_lvl_1(df, line):
 
     # фильтрация значений стопов. В данной базе стоп может быть нуленвым или отрицательным,
     # если остановка короткая. Это стоит фильтровать.
-    df4 = df4.loc[(df4["TimeRaw"] > 0)].reset_index()
+    df4 = df4.loc[(df4["TimeRaw"] > 0)]
+    df4 = df4.reset_index()
 
     # временный столбец, берет дату и смену и возвращает столбец типа "21.10.2020 1".
     # Далее мержится с таким же столбцом из df c буквой смены, чтобы правильно
@@ -274,6 +275,8 @@ def make_bar(df_line_lvl_1, indicat_df, line):
         # Группирование по букве для расчета фактических смен
         df_shift_fact = df_line_lvl_1[["Date", "Shift", "letter", "Line"]]
 
+        
+
         month = df_line_lvl_1["Stop Time"].iloc[0].month
         year = df_line_lvl_1["Stop Time"].iloc[0].year
 
@@ -282,6 +285,7 @@ def make_bar(df_line_lvl_1, indicat_df, line):
         ready_dict = {
             "Date": [0, 0, 0, 0],
             "letter": ["A", "B", "C", "D"],
+            "Shift": [0, 0, 0, 0],
             "Sheets": [0, 0, 0, 0],
         }
 
@@ -290,47 +294,60 @@ def make_bar(df_line_lvl_1, indicat_df, line):
             "Shift": [0, 0, 0, 0],
             "letter": ["A", "B", "C", "D"],
             "Line": [line, line, line, line],
+            "Cached":[0,0,0,0],
         }
 
         ready_df = pd.DataFrame.from_dict(ready_dict)
-
+        
         df_shift_fact = pd.DataFrame.from_dict(shift_fact_dict)
 
         month = datetime.today().month
         year = datetime.today().year
 
+        #shift_df=ready_df.copy
+
+    
     shift_df = pd.pivot_table(
-        ready_df, index=["letter", "Date", "Shift"], values="Sheets", aggfunc="sum"
+        ready_df, index=["letter", "Date", "Shift"],
+        values='Sheets', aggfunc='sum').reset_index()
+
+
+    
+
+    shift_df = shift_df.groupby(["letter"]).agg(
+        Sheets=pd.NamedAgg(column='Sheets', aggfunc='sum'),
+        Shift=pd.NamedAgg(column='Shift', aggfunc='count',)
     ).reset_index()
 
-    shift_df = (
-        shift_df.groupby(["letter"])
-        .agg(
-            Sheets=pd.NamedAgg(column="Sheets", aggfunc="sum"),
-            Shift=pd.NamedAgg(
-                column="Shift",
-                aggfunc="count",
-            ),
-        )
-        .reset_index()
-    )
+    
 
     # группирование по букве смены
-    ready_df = ready_df.groupby(["letter", "Date", "Shift"]).sum().reset_index()
+    ready_df = ready_df.groupby(["letter", "Date","Shift"]).sum().reset_index()
 
     # граппирование по дате, смене и букве
     df_shift_fact = df_shift_fact.groupby(["Date", "Shift", "letter"]).sum()
 
     # группировка по букве
-    df_shift_fact = df_shift_fact.groupby(["letter"]).count().reset_index()
-
-    # переименование
-    df_shift_fact.rename(
+    if not 'Cached' in df_shift_fact.columns:
+        df_shift_fact = df_shift_fact.groupby(["letter"]).count().reset_index()
+            # переименование
+        df_shift_fact.rename(
         columns={
             "Line": "Fact shifts",
         },
         inplace=True,
     )
+    else:
+        df_shift_fact = df_shift_fact.groupby(["letter", "Cached"]).sum().reset_index()
+        df_shift_fact.rename(
+        columns={
+            "Cached": "Fact shifts",
+        },
+        inplace=True,
+    )
+
+
+
 
     # print(df_shift_fact)
 
@@ -340,7 +357,10 @@ def make_bar(df_line_lvl_1, indicat_df, line):
         (df_letter["year"] == year)
         & (df_letter["month"] == month)
         & (df_letter["line"] == line_name)
-    ].reset_index()
+    ]
+
+    # print(df_letter)
+    df_letter.reset_index(inplace=True)
 
     plan = df_letter["plan"].iloc[0]
 
@@ -366,6 +386,8 @@ def make_bar(df_line_lvl_1, indicat_df, line):
         left_on="letter",
         right_on="letter",
     )
+    
+    
 
     table_df = pd.merge(
         df_shift_fact,
@@ -374,6 +396,8 @@ def make_bar(df_line_lvl_1, indicat_df, line):
         left_on="letter",
         right_on="letter",
     )
+
+
 
     table_df.rename(
         columns={
@@ -389,6 +413,8 @@ def make_bar(df_line_lvl_1, indicat_df, line):
         inplace=True,
     )
 
+    
+
     (
         color,
         label,
@@ -400,7 +426,7 @@ def make_bar(df_line_lvl_1, indicat_df, line):
         shift,
     ) = get_df_bar_indicat(indicat_df, line_name)
 
-    # print(ready_df)
+    #print(ready_df)
 
     # график фактического выпуска
     fig = go.Figure(
@@ -410,32 +436,27 @@ def make_bar(df_line_lvl_1, indicat_df, line):
                 x=ready_df["letter"],
                 width=0.5,
                 marker={"color": "#002F6C"},
-                name=None,
-                hovertext=(
-                    "Выпуск: "
-                    + ready_df["Fact Output"].astype(int).astype(str)
-                    + "<br>Смена: "
-                    + ready_df["Shift"].astype(str)
-                    + "<br>Дата: "
-                    + ready_df["Date"].astype(str)
-                ),
+                name = None,
+                hovertext=("Выпуск: " + ready_df["Fact Output"].astype(int).astype(str) + "<br>Смена: " + ready_df["Shift"].astype(str) + "<br>Дата: "+ready_df["Date"].astype(str)),
                 hoverinfo="text",
             )
         ],
         layout=go.Layout(margin=dict(t=30, l=10, b=10, r=10), showlegend=False),
     )
 
+
     # эта функция сравнивает значения фактического и планового выпуска,
     # чтобы добавить к максимальному значению коэффициент, который добавит
     # свободное место на графике. В свободное место будут добавлены аннотации
     # с номером заказа, статусом линии и т.п.
 
-    compar_df = ready_df.groupby(["letter"]).sum().reset_index()
+    compar_df = ready_df.groupby(['letter']).sum().reset_index()
 
     if max(table_df["Planned Output"]) > max(compar_df["Fact Output"]):
         max_y = max(table_df["Planned Output"])
     else:
         max_y = max(compar_df["Fact Output"])
+
 
     # добавление плана
     fig.add_trace(
@@ -488,17 +509,18 @@ def make_bar(df_line_lvl_1, indicat_df, line):
         ],
     )
 
-    # fig.show()
+    #fig.show()
 
-    # shift_df = ready_df.copy()
+    
     table_df.loc["Total"] = shift_df.sum()
+
 
     # переназначение ячейки со сменами на значение 'total' <b></b> - жирный шрифт
     table_df["letter"][-1:] = "<b>Total</b>"
-    table_df["Planned Output"][-1:] = table_df["Planned Output"].sum()
-    table_df["Planned shifts"][-1:] = table_df["Planned shifts"].sum()
-    table_df["Fact Output"][-1:] = table_df["Fact Output"].sum()
-    table_df["Fact shifts"][-1:] = table_df["Fact shifts"].sum()
+    table_df['Planned Output'][-1:] = table_df['Planned Output'].sum()
+    table_df['Planned shifts'][-1:] = table_df['Planned shifts'].sum()
+    table_df['Fact Output'][-1:] = table_df['Fact Output'].sum()
+    table_df['Fact shifts'][-1:] = table_df['Fact shifts'].sum()
 
     del table_df["Shift"]
 
@@ -530,7 +552,7 @@ def make_bar(df_line_lvl_1, indicat_df, line):
 
     fig_t.update_layout(height=165)
 
-    # fig_t.show()
+    fig_t.show()
 
     return fig, fig_t
 
@@ -926,16 +948,18 @@ def Plan_table(df_line_lvl_1):
 
     df_report = df_line_lvl_1[["Line", "letter", "Date", "Shift", "Sheets"]]
 
+    # print(df_report.groupby(['Line','Date','Shift','letter']).sum())
+
 
 if __name__ == "__main__":
 
-    dt = "20201115"
-    dt2 = "20201116"
+    dt = "20201202"
+    dt2 = "20201203"
 
     df_lvl_0 = get_df_lvl_0(dt, dt2)
     # print(df_lvl_0)
 
-    line = "LZ-01"
+    line = "LZ-04"
 
     def _call_line():
 
@@ -948,5 +972,7 @@ if __name__ == "__main__":
         indicat_df = get_df_con()
         make_bar(df_line_lvl_1, indicat_df, line)
 
-    # _call_line()
     _call_bar()
+
+    # _call_line()
+    # _call_bar()

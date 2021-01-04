@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -22,8 +23,7 @@ def ibea_orders():
     return dict(zip(order_set, [cont_material(_, usedb=False) for _ in order_set]))
 
 
-def ibea_stat(orderno):
-    """Эта функция обрабатывает файлы статистики камеры и возвращает df для создания таблицы"""
+def _make_df():
 
     df_ibea_raw = pd.read_csv(path / "data/IBEA/full_commulated.csv", sep=";")
 
@@ -42,11 +42,6 @@ def ibea_stat(orderno):
     ]
     df_ibea_raw["Time End"] = [
         time.time() for time in pd.to_datetime(df_ibea_raw["Time End"].astype(str))
-    ]
-
-    # отрезание выборок менее N шт и фильтрация по номеру заказа
-    df_ibea_raw = df_ibea_raw.loc[
-        (df_ibea_raw["Total"] > 1000) & (df_ibea_raw["Order"] == orderno)
     ]
 
     # словарь сопоставлений заказов и описаний к ним
@@ -69,6 +64,23 @@ def ibea_stat(orderno):
     # отбрасывание процентов больше 10. В случае больше 10, скорее всего
     df_ibea_raw = df_ibea_raw.loc[df_ibea_raw["Percent"] <= 10]
 
+    df_ibea_raw.loc[df_ibea_raw["Shift"] == 2, "Date End"] = df_ibea_raw[
+        "Date End"
+    ] - timedelta(days=1)
+
+    return df_ibea_raw
+
+
+def ibea_stat(orderno):
+    """Эта функция обрабатывает файлы статистики камеры и возвращает df для создания таблицы"""
+
+    df_ibea_raw = _make_df()
+
+    # отрезание выборок менее N шт и фильтрация по номеру заказа
+    df_ibea_raw = df_ibea_raw.loc[
+        (df_ibea_raw["Total"] > 1000) & (df_ibea_raw["Order"] == orderno)
+    ]
+
     # сводная
     df_table = pd.pivot_table(
         df_ibea_raw,
@@ -87,15 +99,50 @@ def ibea_stat(orderno):
         },
     ).reset_index()
 
-    #    df_table["Date End"] = (
-    #       df_table["Date End"] - timedelta(days=1)
-    #      if df_table["Shift"] == 2
-    #     else df_table["Date End"]
-    # )
-
-    df_table.loc[df_table["Shift"] == 2, "Date End"] = df_table["Date End"] - timedelta(
-        days=1
+    df_table = df_table.sort_values(
+        by=["Date End"],
     )
+
+    print(df_table)
+
+    return df_table
+
+
+def ibea_date(dt, dt2):
+
+    dt = pd.to_datetime(dt)
+    dt2 = pd.to_datetime(dt2)
+
+    df_ibea_raw = _make_df()
+
+    # отрезание выборок менее N шт и фильтрация по номеру заказа
+    df_ibea_raw = df_ibea_raw.loc[
+        (df_ibea_raw["Total"] > 1000)
+        & (df_ibea_raw["Date Start"] > dt)
+        & (df_ibea_raw["Date End"] < dt2)
+    ]
+
+    # сводная
+    df_table = pd.pivot_table(
+        df_ibea_raw,
+        values=["Total", "Rejected", "Percent"],
+        index=[
+            "Date End",
+            "Shift",
+            "Order",
+            "Description",
+            "line",
+        ],
+        aggfunc={
+            "Total": np.sum,
+            "Rejected": np.sum,
+            "Percent": np.mean,
+        },
+    ).reset_index()
+
+    # df_table.loc[df_table["Shift"] == 2, "Date End"] = df_table["Date End"] - timedelta(
+    #    days=1
+    # )
 
     df_table = df_table.sort_values(
         by=["Date End"],
@@ -110,6 +157,7 @@ if __name__ == "__main__":
 
     def _ibea_cal():
 
-        ibea_stat("00908")
+        # ibea_stat("00908")
+        ibea_date(date(2020, 12, 1), date(2020, 12, 4))
 
     _ibea_cal()

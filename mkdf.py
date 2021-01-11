@@ -552,7 +552,7 @@ def make_bar(df_line_lvl_1, indicat_df, line):
 
     fig_t.update_layout(height=165)
 
-    fig_t.show()
+    #fig_t.show()
 
     return fig, fig_t
 

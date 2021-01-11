@@ -32,10 +32,11 @@ def get_bar_graph():
 
     year = dtime.today().year
     month = str.zfill(str(dtime.today().month), 2)
+    month2 = str.zfill(str(dtime.today().month+1), 2)
 
     dt = "{}{}01".format(year, month)
 
-    dt2 = "{}{}01".format(year, str(int(month) + 1))
+    dt2 = "{}{}01".format(year, month2)
 
     df_bar_lvl_0 = mkdf.get_df_lvl_0(dt, dt2)
 

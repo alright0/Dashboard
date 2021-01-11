@@ -22,8 +22,6 @@ app = dash.Dash(
 )
 
 lines = ["LZ-01", "LZ-02", "LZ-03", "LZ-04", "LZ-05", "LN-01", "LN-03"]
-g = 1
-
 
 def get_bar_graph():
 

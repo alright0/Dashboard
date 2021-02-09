@@ -206,7 +206,7 @@ def get_df_line_lvl_1(df, line):
 
     # повторная сортировка по дате, которая сбивается после смерживания
     df4 = df4.sort_values(by=["Stop Time"])
-
+    #print(df4)
     return df4
 
 
@@ -220,11 +220,11 @@ def shift_let_list():
 
     # Наполнение листа со списком дат для работы
     datelist = pd.date_range(
-        start=date(2020, 1, 1), end=date(2022, 1, 1), freq="12H"
+        start=date(2021, 2, 1), end=date(2022, 1, 1), freq="12H"
     ).tolist()
 
     # Константное значение порядка смен.
-    LETTER = "DADACDCDBCBCABAB" * 94
+    LETTER = "CBCBDCDCADADBABA" * 94
 
     # Разметка смен в зависимости от четности элемента(чет = 1, нечет = 2)
     shift_list = [1 if shift % 2 == 0 else 2 for shift in range(len(datelist))]
@@ -246,7 +246,7 @@ def shift_let_list():
 
     # удаление номера смены за ненадобностью
     del df["shift"]
-
+    # print(df)
     # Возврат df
     return df
 
@@ -517,7 +517,7 @@ def make_bar(df_line_lvl_1, indicat_df, line):
             },
         ],
     )
-
+    # print(df_graph)
     # fig.show()
 
     table_df.loc["Total"] = shift_df.sum()
@@ -960,13 +960,14 @@ def Plan_table(df_line_lvl_1):
 
 if __name__ == "__main__":
 
-    dt = "20201202"
-    dt2 = "20201203"
+    dt = "20210201"
+    dt2 = "20210206"
 
     df_lvl_0 = get_df_lvl_0(dt, dt2)
     # print(df_lvl_0)
 
     line = "LZ-04"
+    print(get_df_line_lvl_1(df_lvl_0, line))
 
     def _call_line():
 
@@ -979,7 +980,7 @@ if __name__ == "__main__":
         indicat_df = get_df_con()
         make_bar(df_line_lvl_1, indicat_df, line)
 
-    _call_bar()
+    # _call_bar()
 
     # _call_line()
     # _call_bar()

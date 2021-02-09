@@ -24,6 +24,7 @@ app = dash.Dash(
 
 lines = ["LZ-01", "LZ-02", "LZ-03", "LZ-04", "LZ-05", "LN-01", "LN-03"]
 
+
 def get_bar_graph():
 
     indicat_df = mkdf.get_df_con()

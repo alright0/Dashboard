@@ -121,8 +121,6 @@ def get_df_line_lvl_1(df, line):
 
     df2 = df.loc[(df["Line"] == line) & (df["TimeStopRaw"] > 0)]
 
-    # print(df2)
-
     # расчет разницы между предыдущим и следующим значениями
     # для возможности рассчитать суммарный выпуск
     df2["Sheets"] = pd.to_numeric(df2["Counter OUT"].diff())
@@ -170,10 +168,12 @@ def get_df_line_lvl_1(df, line):
 
     df4["Minutes"] = df4["Stop Time"].diff()
     df4["Minutes"].fillna(pd.Timedelta(days=0), inplace=True)
+    # df4["Minutes"] = pd.to_datetime(df4["Minutes"], format="%H:%M:%S")
 
     df4["Sheets"] = pd.to_numeric(df4["Counter OUT"].diff())
     df4["Sheets"].fillna(0, inplace=True)
     df4["Sheets"].clip(lower=0, inplace=True)
+    df4["Sheets"] = df4["Sheets"].astype(int)
 
     # перевод времени в секунды. В дальнейшем выступает
     # размером столбца остановки по оси Х
@@ -206,7 +206,10 @@ def get_df_line_lvl_1(df, line):
 
     # повторная сортировка по дате, которая сбивается после смерживания
     df4 = df4.sort_values(by=["Stop Time"])
-    #print(df4)
+    # print(df4)
+
+    # df4.to_csv(path / "221.csv", sep=";")
+
     return df4
 
 
@@ -218,7 +221,7 @@ def shift_let_list():
     # лист со списком дат
     datelist = []
 
-    # Наполнение листа со списком дат для работы
+    # Наполнение листа со списком дат для работы. начинается в февраля 2021
     datelist = pd.date_range(
         start=date(2021, 2, 1), end=date(2022, 1, 1), freq="12H"
     ).tolist()
@@ -329,7 +332,7 @@ def make_bar(df_line_lvl_1, indicat_df, line):
     # группировка по букве
     if not "Cached" in df_shift_fact.columns:
         df_shift_fact = df_shift_fact.groupby(["letter"]).count().reset_index()
-        # переименование
+
         df_shift_fact.rename(
             columns={
                 "Line": "Fact shifts",
@@ -358,7 +361,7 @@ def make_bar(df_line_lvl_1, indicat_df, line):
     # print(df_letter)
     df_letter.reset_index(inplace=True)
 
-    plan = df_letter["plan"].iloc[0]
+    # plan = df_letter["plan"].iloc[0]
 
     sh_val = settings.LINE_OUTPUT.get(line)
 

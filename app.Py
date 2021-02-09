@@ -13,6 +13,7 @@ from dash.dependencies import Input, Output
 
 import mkdf
 from server import server
+from settings import init_dbcon
 
 app = dash.Dash(
     __name__,
@@ -22,7 +23,6 @@ app = dash.Dash(
 )
 
 lines = ["LZ-01", "LZ-02", "LZ-03", "LZ-04", "LZ-05", "LN-01", "LN-03"]
-
 
 def get_bar_graph():
 

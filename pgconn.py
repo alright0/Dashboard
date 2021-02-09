@@ -224,6 +224,56 @@ def cut_description(result):
     return result
 
 
+def get_name(line):
+    """эта функция получает актуальное имя оператора, который авторизован на линии.
+    Если линия не работает, то не возвращает ничего"""
+
+    cursor = init_dbcon()
+
+    cursor.execute(
+        f"""
+        SELECT shift 
+        FROM up_line_def
+        WHERE fc_line='{line}'
+        """
+    )
+
+    line_status = cursor.fetchall()[0][0]
+
+    # если линия работает найти табельный номер оператора
+    if int(line_status):
+
+        # нахождение табельного номера оператора
+        cursor.execute(
+            f"""
+            SELECT id_brygadz 
+            FROM fc_produkcja 
+            WHERE kod_maszyny='{line}' AND data_zakoncz_zmiana IS NOT NULL
+            ORDER BY data_zakoncz_zmiana DESC
+            LIMIT 1"""
+        )
+
+        user_number = cursor.fetchall()[0][0]
+
+        # по табельному номеру найти имя пользователя
+        cursor.execute(
+            f"""
+            SELECT imie_user, nazwisko_user
+            FROM fc_users 
+            WHERE login_user = '{user_number}'
+            """
+        )
+
+        raw_operator = cursor.fetchall()[0]
+        operator = f"{raw_operator[0]} {raw_operator[1]}"
+
+        # вывести имя пользователя
+        return operator
+
+    else:
+        return ""
+
+
 if __name__ == "__main__":
 
     dt = "20201001"

@@ -178,7 +178,7 @@ def _ibea_agregate():
             ]
 
             dfs.append(df)
-
+            print("{} added!".format(line))
         except FileNotFoundError:
 
             print("file {}.csv not found".format(line))
@@ -194,7 +194,7 @@ def _ibea_agregate():
 
 if __name__ == "__main__":
 
-    get_cache_lvl_0()
-    get_cache_as_line_speed()
-    get_cache_as_material_data()
+    # get_cache_lvl_0()
+    # get_cache_as_line_speed()
+    # get_cache_as_material_data()
     ibea_connect()

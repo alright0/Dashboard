@@ -167,5 +167,5 @@ def get_line_graph(dt):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run_server(debug=True, threaded=False, processes=3)
     # app.run_server(host='10.81.50.14', port=5000, debug=False)

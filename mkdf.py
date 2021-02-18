@@ -168,7 +168,6 @@ def get_df_line_lvl_1(df, line):
 
     df4["Minutes"] = df4["Stop Time"].diff()
     df4["Minutes"].fillna(pd.Timedelta(days=0), inplace=True)
-    # df4["Minutes"] = pd.to_datetime(df4["Minutes"], format="%H:%M:%S")
 
     df4["Sheets"] = pd.to_numeric(df4["Counter OUT"].diff())
     df4["Sheets"].fillna(0, inplace=True)
@@ -199,6 +198,8 @@ def get_df_line_lvl_1(df, line):
     # удаление лишних значений
     del df4["letter_x"]
     del df4["date"]
+    del df4["name_eng"]
+    del df4["dateraw"]
 
     df4.rename(columns={"letter_y": "letter"}, inplace=True)
 

@@ -18,7 +18,6 @@ from dash.dependencies import Input, Output
 import mkdf
 import pgconn
 from server import server
-from waitress import serve
 
 graph = defaultdict(list)
 
@@ -218,5 +217,6 @@ def update(*args):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
+    # app.run_server(debug=False, threaded=True, processes=3)
 #    app.run_server(host='10.81.50.14', port=5000, debug=False
 # serve(app, port=8050)

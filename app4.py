@@ -131,7 +131,7 @@ def update(*args):
                         "align": "left",
                         "xref": "paper",
                         "yref": "paper",
-                        "bordercolor": "None",
+                        # "bordercolor": "None",
                         "x": 0.02,
                         "y": 1,
                         "showarrow": False,

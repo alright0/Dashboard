@@ -149,6 +149,8 @@ def get_df_line_lvl_1(df, line):
     df4 = [df2, df3]
     df4 = pd.concat(df4)
 
+    print(df4)
+
     # присвоение описания кодам остановок
     df4 = pd.merge(df4, df_codes, how="inner", left_on="Stop Code", right_on="code")
 
@@ -964,15 +966,15 @@ def Plan_table(df_line_lvl_1):
 
 if __name__ == "__main__":
 
-    dt = "20210201"
-    dt2 = "20210206"
+    dt = "20210320"
+    dt2 = "20210321"
 
     df_lvl_0 = get_df_lvl_0(dt, dt2)
-    # print(df_lvl_0)
+    print(df_lvl_0)
 
-    line = "LZ-04"
-    print(get_df_line_lvl_1(df_lvl_0, line))
-
+    # line = "LZ-01"
+    # print(get_df_line_lvl_1(df_lvl_0, line))
+    """
     def _call_line():
 
         df_line_lvl_1 = get_df_line_lvl_1(df_lvl_0, line)
@@ -983,7 +985,7 @@ if __name__ == "__main__":
         df_line_lvl_1 = get_df_line_lvl_1(df_lvl_0, line)
         indicat_df = get_df_con()
         make_bar(df_line_lvl_1, indicat_df, line)
-
+    """
     # _call_bar()
 
     # _call_line()
